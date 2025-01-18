@@ -1,0 +1,84 @@
+# Dependencies
+node_modules/
+.pnp/
+.pnp.js
+
+# Build and cache
+dist/
+build/
+.cache/
+.next/
+out/
+*.tsbuildinfo
+node_modules/
+.turbo
+
+# Environment and secrets
+.env
+.env.local
+.env.*.local
+.env.development
+.env.test
+.env.production
+*.pem
+.cert/
+
+# Testing and coverage
+coverage/
+.nyc_output/
+
+# Debug logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Editor directories and files
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*.sublime-workspace
+*.sublime-project
+.DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+Desktop.ini
+
+# Project specific
+temp/
+processed/
+server/public/
+uploads/
+*.tar.gz
+*.zip
+*.mp3
+*.wav
+*.flac
+
+# TypeScript
+*.tsbuildinfo
+vite.config.ts.*
+
+# Drizzle
+drizzle/
+
+# Replit specific
+.replit/
+.breakpoints
+.replit
+replit.nix
+.replitenv
+.local/
+.upm/
+.config/
+.npm/
+.cache/
+.node-gyp/
