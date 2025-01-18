@@ -39,7 +39,7 @@ A professional audio processing web application that transforms stereo audio int
    ```bash
    cp .env.example .env
    ```
-   Edit `.env` with your IRCAM Amplify API credentials from https://www.ircam-amplify.io/
+   Edit `.env` with your IRCAM Amplify API credentials from https://www.ircamamplify.io
 
 4. Start the development server:
    ```bash
@@ -51,7 +51,7 @@ A professional audio processing web application that transforms stereo audio int
 ## Prerequisites
 
 - Node.js 20 or later
-- IRCAM Amplify API credentials (Sign up at https://www.ircam-amplify.io/)
+- IRCAM Amplify API credentials (Sign up at https://www.ircamamplify.io)
 - Modern web browser with Web Audio API support
 
 ## Technical Stack
@@ -144,7 +144,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - IRCAM Amplify for their spatial audio technology
 - The open-source community for the tools and libraries used
 
-For more information about IRCAM Amplify and their spatial audio technology, visit [their website](https://www.ircam-amplify.io/).
+For more information about IRCAM Amplify and their spatial audio technology, visit [their website](https://www.ircamamplify.io).
 
 ## Security
 
