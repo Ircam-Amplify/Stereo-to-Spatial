@@ -2,6 +2,7 @@ import axios from "axios";
 import path from "path";
 import fs from "fs/promises";
 import { fileURLToPath } from "url";
+import { logger } from "../lib/logger";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -11,7 +12,7 @@ let tokenExpiry: number | null = null;
 
 const IRCAM_AUTH_URL = "https://api.ircamamplify.io/oauth/token";
 const IRCAM_STORAGE_URL = "https://storage.ircamamplify.io";
-const IRCAM_SPATIAL_URL = "https://api.ircamamplify.io/stereotospatial/"; // Note the trailing slash
+const IRCAM_SPATIAL_URL = "https://api.ircamamplify.io/stereotospatial/";
 const CLIENT_ID = process.env.IRCAM_CLIENT_ID;
 const CLIENT_SECRET = process.env.IRCAM_CLIENT_SECRET;
 const TEMP_DIR = path.join(__dirname, "../../temp");
@@ -22,12 +23,8 @@ if (!CLIENT_ID || !CLIENT_SECRET) {
 
 export async function refreshIrcamToken() {
   try {
-    console.log("\n=== Refreshing IRCAM Token ===");
-    console.log("URL:", IRCAM_AUTH_URL);
-    console.log("Request payload:", {
-      client_id: CLIENT_ID,
-      grant_type: "client_credentials",
-    });
+    logger.info('IRCAM', 'Refreshing access token');
+    logger.debug('IRCAM', `Auth URL: ${IRCAM_AUTH_URL}`);
 
     const response = await axios.post(IRCAM_AUTH_URL, {
       client_id: CLIENT_ID,
@@ -37,26 +34,23 @@ export async function refreshIrcamToken() {
 
     ircamToken = response.data.id_token;
     tokenExpiry = Date.now() + 30 * 60 * 1000;
-    console.log("Token refresh successful");
-    console.log("Token expiry:", new Date(tokenExpiry).toLocaleString());
+
+    logger.info('IRCAM', 'Token refresh successful');
+    logger.debug('IRCAM', `Token expires: ${new Date(tokenExpiry).toLocaleString()}`);
 
     return ircamToken;
   } catch (error) {
-    console.error("\n=== Token Refresh Error ===");
+    logger.error('IRCAM', 'Token refresh failed');
     if (axios.isAxiosError(error)) {
-      console.error("Request details:", {
+      logger.error('IRCAM', {
         method: error.config?.method?.toUpperCase(),
         url: error.config?.url,
-        headers: error.config?.headers,
-        data: error.config?.data,
-      });
-      console.error("Response details:", {
         status: error.response?.status,
         statusText: error.response?.statusText,
         data: error.response?.data,
       });
     } else {
-      console.error("Failed to refresh token:", error);
+      logger.error('IRCAM', error);
     }
     throw error;
   }
@@ -92,42 +86,38 @@ export function getIrcamHeaders() {
 
 export async function uploadToIrcamStorage(localFilePath: string) {
   try {
-    console.log("\n=== Starting IRCAM Storage Upload ===");
-    console.log(`File: ${localFilePath}`);
+    logger.info('IRCAM', 'Starting storage upload');
+    logger.debug('IRCAM', `File: ${localFilePath}`);
     const startTime = Date.now();
 
-    // Ensure we have a valid token before proceeding
-    console.log("\n1. Ensuring valid IRCAM token...");
+    logger.info('IRCAM', 'Ensuring valid token...');
     await ensureValidToken();
-    console.log("Token validation successful");
+    logger.info('IRCAM', 'Token validation successful');
 
-    // Create storage location
-    console.log("\n2. Creating IRCAM storage location...");
+    logger.info('IRCAM', 'Creating storage location...');
     const managerUrl = "https://storage.ircamamplify.io/manager/";
     const headers = getIrcamHeaders();
 
-    console.log("Request details:");
-    console.log("- URL:", managerUrl);
-    console.log("- Method: POST");
-    console.log("- Headers:", JSON.stringify(headers, null, 2));
+    logger.debug('IRCAM', "Request details:");
+    logger.debug('IRCAM', `- URL: ${managerUrl}`);
+    logger.debug('IRCAM', `- Method: POST`);
+    logger.debug('IRCAM', `- Headers: ${JSON.stringify(headers, null, 2)}`);
 
     const createResponse = await axios.post(managerUrl, {}, { headers });
     const fileId = createResponse.data.id;
-    console.log("\nStorage location created:");
-    console.log("- File ID:", fileId);
-    console.log("- Response:", JSON.stringify(createResponse.data, null, 2));
+    logger.info('IRCAM', 'Storage location created');
+    logger.debug('IRCAM', `- File ID: ${fileId}`);
+    logger.debug('IRCAM', `- Response: ${JSON.stringify(createResponse.data, null, 2)}`);
 
-    // Upload file
     const filename = path.basename(localFilePath);
     const putUrl = `${IRCAM_STORAGE_URL}/${fileId}/${filename}`;
-    console.log("\n3. Uploading file to IRCAM storage:");
-    console.log("- Upload URL:", putUrl);
+    logger.info('IRCAM', 'Uploading file to storage');
+    logger.debug('IRCAM', `- Upload URL: ${putUrl}`);
 
     const fileContent = await fs.readFile(localFilePath);
     const fileSize = fileContent.length;
-    console.log(`- File size: ${(fileSize / 1024 / 1024).toFixed(2)}MB`);
+    logger.debug('IRCAM', `- File size: ${(fileSize / 1024 / 1024).toFixed(2)}MB`);
 
-    // Ensure token is still valid before large file upload
     await ensureValidToken();
     await axios.put(putUrl, fileContent, {
       headers: {
@@ -135,47 +125,41 @@ export async function uploadToIrcamStorage(localFilePath: string) {
         "Content-Type": "application/octet-stream",
       },
     });
-    console.log("File upload completed successfully");
+    logger.info('IRCAM', 'File upload completed successfully');
 
-    // Get IAS URL
-    console.log("\n4. Retrieving IAS URL...");
-    // Ensure token is still valid before final request
+    logger.info('IRCAM', 'Retrieving IAS URL...');
     await ensureValidToken();
-    console.log("Request details:");
-    console.log("- URL:", managerUrl + fileId);
-    console.log("- Method: GET");
-    console.log("- Headers:", JSON.stringify(getIrcamHeaders(), null, 2));
+    logger.debug('IRCAM', "Request details:");
+    logger.debug('IRCAM', `- URL: ${managerUrl + fileId}`);
+    logger.debug('IRCAM', `- Method: GET`);
+    logger.debug('IRCAM', `- Headers: ${JSON.stringify(getIrcamHeaders(), null, 2)}`);
 
     const statusResponse = await axios.get(managerUrl + fileId, {
       headers: getIrcamHeaders(),
     });
     const iasUrl = statusResponse.data.ias;
-    console.log("- IAS URL:", iasUrl);
-    console.log("- Full status:", JSON.stringify(statusResponse.data, null, 2));
+    logger.debug('IRCAM', `- IAS URL: ${iasUrl}`);
+    logger.debug('IRCAM', `- Full status: ${JSON.stringify(statusResponse.data, null, 2)}`);
 
     const duration = ((Date.now() - startTime) / 1000).toFixed(2);
-    console.log(`\n=== Upload completed in ${duration}s ===\n`);
+    logger.info('IRCAM', `Upload completed in ${duration}s`);
 
     return {
       fileId,
       iasUrl,
     };
   } catch (error) {
-    console.error("\n=== IRCAM Storage Upload Error ===");
+    logger.error('IRCAM', 'Storage upload failed');
     if (axios.isAxiosError(error)) {
-      console.error("Request details:", {
+      logger.error('IRCAM', {
         method: error.config?.method?.toUpperCase(),
         url: error.config?.url,
-        headers: error.config?.headers,
-        data: error.config?.data,
-      });
-      console.error("Response details:", {
         status: error.response?.status,
         statusText: error.response?.statusText,
         data: error.response?.data,
       });
     } else {
-      console.error("\nFailed to upload to IRCAM storage:", error);
+      logger.error('IRCAM', error);
     }
     throw error;
   }
@@ -183,68 +167,59 @@ export async function uploadToIrcamStorage(localFilePath: string) {
 
 async function downloadFile(fileId: string, type: 'binaural' | 'immersive', sessionDir: string) {
   try {
-    console.log(`\n=== Downloading ${type} file (ID: ${fileId}) ===`);
+    logger.info('IRCAM', `Downloading ${type} file (ID: ${fileId})`);
     await ensureValidToken();
     const headers = getIrcamHeaders();
 
-    // Get file metadata
-    console.log("\n1. Getting file metadata...");
+    logger.info('IRCAM', 'Getting file metadata...');
     const metadataUrl = `${IRCAM_STORAGE_URL}/manager/${fileId}`;
-    console.log("Request details:");
-    console.log("- URL:", metadataUrl);
-    console.log("- Method: GET");
-    console.log("- Headers:", JSON.stringify(headers, null, 2));
+    logger.debug('IRCAM', "Request details:");
+    logger.debug('IRCAM', `- URL: ${metadataUrl}`);
+    logger.debug('IRCAM', `- Method: GET`);
+    logger.debug('IRCAM', `- Headers: ${JSON.stringify(headers, null, 2)}`);
 
     const metadataResponse = await axios.get(metadataUrl, { headers });
     const originalFilename = metadataResponse.data.filename;
-    console.log("File metadata:", JSON.stringify(metadataResponse.data, null, 2));
+    logger.debug('IRCAM', `File metadata: ${JSON.stringify(metadataResponse.data, null, 2)}`);
 
-    // Download file
-    console.log("\n2. Downloading file content...");
+    logger.info('IRCAM', 'Downloading file content...');
     const downloadUrl = `${IRCAM_STORAGE_URL}/${fileId}/${originalFilename}`;
-    console.log("Request details:");
-    console.log("- URL:", downloadUrl);
-    console.log("- Method: GET");
-    console.log("- Headers:", JSON.stringify(headers, null, 2));
+    logger.debug('IRCAM', "Request details:");
+    logger.debug('IRCAM', `- URL: ${downloadUrl}`);
+    logger.debug('IRCAM', `- Method: GET`);
+    logger.debug('IRCAM', `- Headers: ${JSON.stringify(headers, null, 2)}`);
 
     const response = await axios.get(downloadUrl, {
       headers,
       responseType: 'arraybuffer'
     });
 
-    // Extract base name from original filename (removing any _2_binaural, etc.)
     const baseFileName = path.basename(originalFilename)
-      .replace(/_(2|18)_(binaural|immersive)\.[^.]+$/, '')  // Remove IRCAM suffixes
-      .replace(/^original_/, '')  // Remove our 'original_' prefix
-      .replace(/\.[^.]+$/, '');  // Remove extension
+      .replace(/_(2|18)_(binaural|immersive)\.[^.]+$/, '')
+      .replace(/^original_/, '')
+      .replace(/\.[^.]+$/, '');
 
-    // Create simplified filename based on type
     const ext = type === 'binaural' ? '.mp3' : '.wav';
     const filename = `${type}_${baseFileName}${ext}`;
     const outputPath = path.join(sessionDir, filename);
 
-    // Save file
     await fs.writeFile(outputPath, response.data);
-    console.log(`\nFile saved successfully at: ${outputPath}`);
+    logger.info('IRCAM', `File saved successfully at: ${outputPath}`);
 
-    // Return the relative path from TEMP_DIR
     const relativePath = path.relative(TEMP_DIR, outputPath);
     return relativePath;
   } catch (error) {
-    console.error(`\n=== ${type} File Download Error ===`);
+    logger.error('IRCAM', `${type} file download failed`);
     if (axios.isAxiosError(error)) {
-      console.error("Request details:", {
+      logger.error('IRCAM', {
         method: error.config?.method?.toUpperCase(),
         url: error.config?.url,
-        headers: error.config?.headers,
-      });
-      console.error("Response details:", {
         status: error.response?.status,
         statusText: error.response?.statusText,
         data: error.response?.data,
       });
     } else {
-      console.error(`Failed to download ${type} file:`, error);
+      logger.error('IRCAM', error);
     }
     throw error;
   }
@@ -252,11 +227,10 @@ async function downloadFile(fileId: string, type: 'binaural' | 'immersive', sess
 
 export async function spatializeAudio(iasUrl: string, intensity: string, sessionDir: string) {
   try {
-    console.log("\n=== Starting Audio Spatialization ===");
+    logger.info('IRCAM', 'Starting audio spatialization');
     const startTime = Date.now();
 
-    // Step 1: Submit spatialization job
-    console.log("\n1. Submitting spatialization job...");
+    logger.info('IRCAM', 'Submitting spatialization job...');
     await ensureValidToken();
     const headers = getIrcamHeaders();
 
@@ -264,49 +238,46 @@ export async function spatializeAudio(iasUrl: string, intensity: string, session
       audioUrl: iasUrl,
       presetId: parseInt(intensity),
     };
-    console.log("Request details:");
-    console.log("- URL:", IRCAM_SPATIAL_URL);
-    console.log("- Method: POST");
-    console.log("- Headers:", JSON.stringify(headers, null, 2));
-    console.log("- Payload:", JSON.stringify(payload, null, 2));
+    logger.debug('IRCAM', "Request details:");
+    logger.debug('IRCAM', `- URL: ${IRCAM_SPATIAL_URL}`);
+    logger.debug('IRCAM', `- Method: POST`);
+    logger.debug('IRCAM', `- Headers: ${JSON.stringify(headers, null, 2)}`);
+    logger.debug('IRCAM', `- Payload: ${JSON.stringify(payload, null, 2)}`);
 
     const response = await axios.post(IRCAM_SPATIAL_URL, payload, { headers });
-    console.log("\nInitial response:", JSON.stringify(response.data, null, 2));
+    logger.debug('IRCAM', `Initial response: ${JSON.stringify(response.data, null, 2)}`);
 
     if (!response.data.id) {
       throw new Error("No job ID returned from IRCAM API");
     }
 
     const jobId = response.data.id;
-    console.log(`\nJob ID: ${jobId}`);
+    logger.info('IRCAM', `Job ID: ${jobId}`);
 
-    // Step 2: Poll for job completion
-    console.log("\n2. Monitoring job status...");
+    logger.info('IRCAM', 'Monitoring job status...');
     let processStatus = null;
     let pollCount = 0;
 
     while (processStatus !== "success" && processStatus !== "error") {
       pollCount++;
-      console.log(`\nPoll attempt ${pollCount}...`);
+      logger.info('IRCAM', `Poll attempt ${pollCount}...`);
 
-      // Wait 5 seconds between subsequent checks
       if (pollCount > 1) {
         await new Promise((resolve) => setTimeout(resolve, 5000));
       }
 
-      // Ensure token is valid before each status check
       await ensureValidToken();
       const statusUrl = `${IRCAM_SPATIAL_URL}${jobId}`;
 
-      console.log("Status check request details:");
-      console.log("- URL:", statusUrl);
-      console.log("- Method: GET");
-      console.log("- Headers:", JSON.stringify(getIrcamHeaders(), null, 2));
+      logger.debug('IRCAM', "Status check request details:");
+      logger.debug('IRCAM', `- URL: ${statusUrl}`);
+      logger.debug('IRCAM', `- Method: GET`);
+      logger.debug('IRCAM', `- Headers: ${JSON.stringify(getIrcamHeaders(), null, 2)}`);
 
       const statusResponse = await axios.get(statusUrl, {
         headers: getIrcamHeaders(),
       });
-      console.log("Status response:", JSON.stringify(statusResponse.data, null, 2));
+      logger.debug('IRCAM', `Status response: ${JSON.stringify(statusResponse.data, null, 2)}`);
 
       const jobInfos = statusResponse.data.job_infos;
       if (!jobInfos) {
@@ -314,27 +285,26 @@ export async function spatializeAudio(iasUrl: string, intensity: string, session
       }
 
       processStatus = jobInfos.job_status;
-      console.log(`Current status: ${processStatus}`);
+      logger.info('IRCAM', `Current status: ${processStatus}`);
     }
 
     if (processStatus === "error") {
       throw new Error("Spatialization job failed");
     }
 
-    // Step 3: Get final results
-    console.log("\n3. Retrieving final results...");
+    logger.info('IRCAM', 'Retrieving final results...');
     await ensureValidToken();
 
     const finalUrl = `${IRCAM_SPATIAL_URL}${jobId}`;
-    console.log("Final request details:");
-    console.log("- URL:", finalUrl);
-    console.log("- Method: GET");
-    console.log("- Headers:", JSON.stringify(getIrcamHeaders(), null, 2));
+    logger.debug('IRCAM', "Final request details:");
+    logger.debug('IRCAM', `- URL: ${finalUrl}`);
+    logger.debug('IRCAM', `- Method: GET`);
+    logger.debug('IRCAM', `- Headers: ${JSON.stringify(getIrcamHeaders(), null, 2)}`);
 
     const finalResponse = await axios.get(finalUrl, {
       headers: getIrcamHeaders(),
     });
-    console.log("Final response:", JSON.stringify(finalResponse.data, null, 2));
+    logger.debug('IRCAM', `Final response: ${JSON.stringify(finalResponse.data, null, 2)}`);
 
     const jobInfos = finalResponse.data.job_infos;
     if (!jobInfos?.report_info?.report) {
@@ -344,11 +314,10 @@ export async function spatializeAudio(iasUrl: string, intensity: string, session
     const report = jobInfos.report_info.report;
     const duration = ((Date.now() - startTime) / 1000).toFixed(2);
 
-    console.log(`\n=== Spatialization completed in ${duration}s ===`);
-    console.log("Final report:", JSON.stringify(report, null, 2));
+    logger.info('IRCAM', `Spatialization completed in ${duration}s`);
+    logger.debug('IRCAM', `Final report: ${JSON.stringify(report, null, 2)}`);
 
-    // Download processed files
-    console.log("\n=== Downloading processed files ===");
+    logger.info('IRCAM', 'Downloading processed files...');
     const downloads: { binaural?: string; immersive?: string } = {};
 
     if (report.binauralFile?.id) {
@@ -365,21 +334,17 @@ export async function spatializeAudio(iasUrl: string, intensity: string, session
       downloads
     };
   } catch (error) {
-    console.error("\n=== Spatialization Error ===");
+    logger.error('IRCAM', 'Spatialization failed');
     if (axios.isAxiosError(error)) {
-      console.error("Request details:", {
+      logger.error('IRCAM', {
         method: error.config?.method?.toUpperCase(),
         url: error.config?.url,
-        headers: error.config?.headers,
-        data: error.config?.data,
-      });
-      console.error("Response details:", {
         status: error.response?.status,
         statusText: error.response?.statusText,
         data: error.response?.data,
       });
     } else {
-      console.error("Failed to spatialize audio:", error);
+      logger.error('IRCAM', error);
     }
     throw error;
   }
