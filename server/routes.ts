@@ -395,7 +395,10 @@ export function registerRoutes(app: Express): Server {
     const zipFilePath = path.join(sessionDir, zipFileName);
 
     const output = createWriteStream(zipFilePath);
-    const archive = archiver('zip', { zlib: { level: 9 } });
+    const archive = archiver('zip', {
+      zlib: { level: 9 }, // Maximum compression
+      comment: 'Stereo-to-Spatial processed audio files'
+    });
 
     archive.on('warning', function(err) {
       if (err.code === 'ENOENT') {
@@ -410,6 +413,11 @@ export function registerRoutes(app: Express): Server {
       throw err;
     });
 
+    // Log compression progress
+    archive.on('entry', function(entry) {
+      log(`Adding: ${entry.name} (${formatFileSize(entry.size)})`);
+    });
+
     archive.pipe(output);
 
     const filesToAdd = [
@@ -417,25 +425,43 @@ export function registerRoutes(app: Express): Server {
       { path: path.join(TEMP_DIR, immersivePath), name: path.basename(immersivePath) }
     ];
 
+    // Only add files that exist
     for (const file of filesToAdd) {
       try {
         await fs.access(file.path);
+        const stats = await fs.stat(file.path);
+        log(`Adding ${file.name} (${formatFileSize(stats.size)})`);
         archive.append(createReadStream(file.path), { name: file.name });
       } catch (error) {
-        log(`Failed to access file: ${file.path}`, 'error');
-        throw error;
+        log(`Skipping missing file: ${file.path}`);
       }
     }
 
     await archive.finalize();
 
+    // Log final ZIP size
     await new Promise((resolve, reject) => {
-      output.on('close', resolve);
+      output.on('close', async () => {
+        try {
+          const stats = await fs.stat(zipFilePath);
+          log(`Archive created: ${formatFileSize(stats.size)}`);
+          resolve(undefined);
+        } catch (error) {
+          reject(error);
+        }
+      });
       output.on('error', reject);
     });
 
-    log('ZIP archive created successfully');
     return zipFilePath;
+  }
+
+  function formatFileSize(bytes: number): string {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
   }
 
   return httpServer;

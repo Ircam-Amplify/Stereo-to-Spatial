@@ -9,6 +9,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Wand2, Loader2, Download, FileMusic } from "lucide-react";
 import { ProcessingStatus } from "@/components/processing-status";
 import { cn } from "@/lib/utils";
+import { ErrorDisplay } from "@/components/error-display";
 
 interface CurrentFileResponse {
   audioUrl: string | null;
@@ -63,6 +64,7 @@ export default function Home() {
     immersive?: number;
     zip?: number;
   }>({});
+  const [authError, setAuthError] = useState<string>();
 
   const { data: currentFile, isError } = useQuery<CurrentFileResponse>({
     queryKey: ["/api/current-file"],
@@ -76,14 +78,22 @@ export default function Home() {
   }, [currentFile]);
 
   useEffect(() => {
-    fetch("/api/check-token").catch(() => {
-      toast({
-        title: "Service Unavailable",
-        description: "Unable to connect to IRCAM services",
-        variant: "destructive",
-        duration: 5000,
+    fetch("/api/check-token")
+      .then(async (response) => {
+        if (!response.ok) {
+          const text = await response.text();
+          throw new Error(text);
+        }
+      })
+      .catch((error) => {
+        setAuthError("Unable to connect to IRCAM services. Please check your credentials and try again.");
+        toast({
+          title: "Service Unavailable",
+          description: "Unable to connect to IRCAM services",
+          variant: "destructive",
+          duration: 5000,
+        });
       });
-    });
   }, [toast]);
 
   const handleSpatialize = async () => {
@@ -288,6 +298,13 @@ export default function Home() {
       <h1 className="text-3xl font-bold mb-8 text-center bg-gradient-to-r from-primary/90 to-primary/70 bg-clip-text text-transparent">
         Stereo-to-Spatial by IRCAM Amplify
       </h1>
+
+      {authError && (
+        <ErrorDisplay 
+          title="Authentication Error" 
+          message={authError}
+        />
+      )}
 
       <Card className="mb-8">
         <CardContent className="pt-6">
