@@ -29,7 +29,6 @@ export function WaveformVisualizer({
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [isReady, setIsReady] = useState(false);
-  const audioBufferRef = useRef<AudioBuffer | null>(null);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -39,7 +38,6 @@ export function WaveformVisualizer({
         wavesurferRef.current.destroy();
         wavesurferRef.current = undefined;
       }
-      audioBufferRef.current = null;
     };
 
     cleanup();
@@ -59,23 +57,10 @@ export function WaveformVisualizer({
         cursorWidth: 1,
         interact: true,
         fillParent: true,
-        minPxPerSec: 1,
-        mediaControls: true,
-        renderFunction: (peaks, ctx) => {
-          if (!ctx) return;
-          const height = ctx.canvas.height;
-          const width = ctx.canvas.width;
-          const scale = window.devicePixelRatio;
-
-          ctx.scale(scale, scale);
-          ctx.fillStyle = waveColor;
-
-          peaks.forEach((peak, index) => {
-            const x = (width / peaks.length) * index;
-            const h = Math.max(1, Math.abs(peak * height));
-            ctx.fillRect(x, (height - h) / 2, 1, h);
-          });
-        }
+        minPxPerSec: 50,
+        barWidth: 2,
+        barGap: 1,
+        barRadius: 2
       });
 
       wavesurfer.on('ready', () => {
@@ -86,8 +71,8 @@ export function WaveformVisualizer({
         }
       });
 
-      wavesurfer.on('error', (err) => {
-        console.error('WaveSurfer error:', err);
+      wavesurfer.on('error', () => {
+        console.error('WaveSurfer error encountered');
         setLoadError(true);
         setIsLoading(false);
       });
