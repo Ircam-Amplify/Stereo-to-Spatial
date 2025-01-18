@@ -86,10 +86,10 @@ export default function Home() {
         }
       })
       .catch((error) => {
-        setAuthError("Unable to connect to IRCAM services. Please check your credentials and try again.");
+        setAuthError("Unable to connect to IRCAM Amplify services. Please check your credentials and try again.");
         toast({
           title: "Service Unavailable",
-          description: "Unable to connect to IRCAM services",
+          description: "Unable to connect to IRCAM Amplify services",
           variant: "destructive",
           duration: 5000,
         });
@@ -114,7 +114,7 @@ export default function Home() {
 
     toast({
       title: "Processing Started",
-      description: "Starting audio spatialization with IRCAM's advanced processing...",
+      description: "Starting audio spatialization with IRCAM Amplify's advanced processing...",
       duration: 3000,
     });
 
