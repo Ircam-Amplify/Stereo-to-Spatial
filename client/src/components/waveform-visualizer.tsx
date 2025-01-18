@@ -28,100 +28,93 @@ export function WaveformVisualizer({
   const wavesurferRef = useRef<WaveSurfer>();
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
-  const [isReady, setIsReady] = useState(false);
 
+  // Initialize WaveSurfer
   useEffect(() => {
     if (!containerRef.current) return;
 
-    const cleanup = () => {
-      if (wavesurferRef.current) {
-        wavesurferRef.current.destroy();
-        wavesurferRef.current = undefined;
+    const wavesurfer = WaveSurfer.create({
+      container: containerRef.current,
+      waveColor,
+      progressColor,
+      height: 40,
+      normalize: true,
+      backend: 'WebAudio',
+      hideScrollbar: true,
+      cursorWidth: 1,
+      interact: true,
+      fillParent: true,
+      minPxPerSec: 50,
+      barWidth: 2,
+      barGap: 1,
+      barRadius: 2
+    });
+
+    wavesurferRef.current = wavesurfer;
+
+    // Handle ready event
+    wavesurfer.on('ready', () => {
+      setIsLoading(false);
+      if (initialTime > 0) {
+        wavesurfer.setTime(initialTime);
       }
-    };
+    });
 
-    cleanup();
-    setIsLoading(true);
-    setLoadError(false);
-    setIsReady(false);
-
-    try {
-      const wavesurfer = WaveSurfer.create({
-        container: containerRef.current,
-        waveColor,
-        progressColor,
-        height: 40,
-        normalize: true,
-        backend: 'WebAudio',
-        hideScrollbar: true,
-        cursorWidth: 1,
-        interact: true,
-        fillParent: true,
-        minPxPerSec: 50,
-        barWidth: 2,
-        barGap: 1,
-        barRadius: 2
-      });
-
-      wavesurfer.on('ready', () => {
-        setIsLoading(false);
-        setIsReady(true);
-        if (initialTime > 0) {
-          wavesurfer.setTime(initialTime);
-        }
-      });
-
-      wavesurfer.on('error', () => {
-        console.error('WaveSurfer error encountered');
-        setLoadError(true);
-        setIsLoading(false);
-      });
-
-      wavesurfer.on('timeupdate', (time) => {
-        onTimeUpdate(time);
-      });
-
-      wavesurfer.on('finish', () => {
-        onPlayPause();
-      });
-
-      // Create an audio element for preloading
-      const audio = new Audio();
-      audio.src = audioUrl;
-      audio.preload = 'auto';
-
-      // Once audio is loaded, pass it to WaveSurfer
-      audio.addEventListener('canplay', () => {
-        wavesurfer.load(audioUrl);
-      });
-
-      wavesurferRef.current = wavesurfer;
-
-      return () => {
-        audio.remove();
-        cleanup();
-      };
-    } catch (error) {
-      console.error('Error initializing WaveSurfer:', error);
+    // Handle errors
+    wavesurfer.on('error', (error) => {
+      console.error('WaveSurfer error:', error);
       setLoadError(true);
       setIsLoading(false);
-    }
-  }, [audioUrl, initialTime, waveColor, progressColor]);
+    });
 
+    // Handle time updates
+    wavesurfer.on('audioprocess', (time) => {
+      onTimeUpdate(time);
+    });
+
+    // Handle finish
+    wavesurfer.on('finish', () => {
+      onPlayPause();
+    });
+
+    // Load audio
+    wavesurfer.load(audioUrl);
+
+    // Cleanup
+    return () => {
+      if (wavesurfer) {
+        wavesurfer.destroy();
+      }
+    };
+  }, [audioUrl]); // Only recreate when audioUrl changes
+
+  // Handle play/pause state
   useEffect(() => {
     const wavesurfer = wavesurferRef.current;
-    if (!wavesurfer || isLoading || !isReady) return;
+    if (!wavesurfer || isLoading) return;
 
-    try {
-      if (isPlaying) {
-        wavesurfer.play();
-      } else {
-        wavesurfer.pause();
-      }
-    } catch (error) {
-      console.error('Playback control error:', error);
+    if (isPlaying && !wavesurfer.isPlaying()) {
+      wavesurfer.play();
+    } else if (!isPlaying && wavesurfer.isPlaying()) {
+      wavesurfer.pause();
     }
-  }, [isPlaying, isLoading, isReady]);
+  }, [isPlaying, isLoading]);
+
+  // Handle clicks on waveform
+  useEffect(() => {
+    const wavesurfer = wavesurferRef.current;
+    if (!wavesurfer) return;
+
+    const handleClick = () => {
+      onPlayPause();
+    };
+
+    wavesurfer.on('click', handleClick);
+
+    return () => {
+      wavesurfer.un('click', handleClick);
+    };
+  }, [onPlayPause]);
 
   if (loadError) {
     return (
