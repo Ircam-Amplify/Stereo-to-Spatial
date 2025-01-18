@@ -65,9 +65,13 @@ export default function Home() {
     zip?: number;
   }>({});
   const [authError, setAuthError] = useState<string>();
+  const [currentSessionId, setCurrentSessionId] = useState<string>();
 
   const { data: currentFile, isError } = useQuery<CurrentFileResponse>({
-    queryKey: ["/api/current-file"],
+    queryKey: ["/api/current-file", currentSessionId],
+    queryFn: () =>
+      fetch(`/api/current-file${currentSessionId ? `?sessionId=${currentSessionId}` : ""}`)
+        .then((res) => res.json()),
     retry: false,
   });
 
@@ -86,10 +90,12 @@ export default function Home() {
         }
       })
       .catch((error) => {
-        setAuthError("Unable to connect to IRCAM Amplify services. Please check your credentials and try again.");
+        setAuthError(
+          "Unable to connect to IRCAM services. Please check your credentials and try again."
+        );
         toast({
           title: "Service Unavailable",
-          description: "Unable to connect to IRCAM Amplify services",
+          description: "Unable to connect to IRCAM services",
           variant: "destructive",
           duration: 5000,
         });
@@ -108,13 +114,14 @@ export default function Home() {
       setProcessingFileInfo({
         name: file.name,
         size: file.size,
-        type: file.type
+        type: file.type,
       });
     }
 
     toast({
       title: "Processing Started",
-      description: "Starting audio spatialization with IRCAM Amplify's advanced processing...",
+      description:
+        "Starting audio spatialization with IRCAM's advanced processing...",
       duration: 3000,
     });
 
@@ -163,7 +170,8 @@ export default function Home() {
 
       toast({
         title: "Success",
-        description: "Your audio has been transformed! You can now download the processed versions.",
+        description:
+          "Your audio has been transformed! You can now download the processed versions.",
         duration: 4000,
       });
     } catch (error) {
@@ -198,10 +206,10 @@ export default function Home() {
         throw new Error(await response.text());
       }
 
-      const contentDisposition = response.headers.get('Content-Disposition');
+      const contentDisposition = response.headers.get("Content-Disposition");
       const filename = contentDisposition
-        ? contentDisposition.split('filename=')[1].replace(/["']/g, '')
-        : 'processed_audio.zip';
+        ? contentDisposition.split("filename=")[1].replace(/["']/g, "")
+        : "processed_audio.zip";
 
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
@@ -215,7 +223,8 @@ export default function Home() {
 
       toast({
         title: "Download Started",
-        description: "All processed audio files are being downloaded as ZIP",
+        description:
+          "All processed audio files are being downloaded as ZIP",
         duration: 3000,
       });
     } catch (error) {
@@ -230,7 +239,7 @@ export default function Home() {
   };
 
   const formatFileSize = (bytes?: number): string => {
-    if (!bytes) return '';
+    if (!bytes) return "";
     const mb = bytes / (1024 * 1024);
     return `(${mb.toFixed(1)} MB)`;
   };
@@ -247,7 +256,7 @@ export default function Home() {
     );
   }
 
-  const handleDownloadFile = async (type: 'binaural' | 'immersive') => {
+  const handleDownloadFile = async (type: "binaural" | "immersive") => {
     if (!sessionId) return;
 
     toast({
@@ -262,10 +271,12 @@ export default function Home() {
         throw new Error(await response.text());
       }
 
-      const contentDisposition = response.headers.get('Content-Disposition');
+      const contentDisposition = response.headers.get("Content-Disposition");
       const filename = contentDisposition
-        ? contentDisposition.split('filename=')[1].replace(/["']/g, '')
-        : `processed_audio_${type}.${type === 'binaural' ? 'mp3' : 'wav'}`;
+        ? contentDisposition.split("filename=")[1].replace(/["']/g, "")
+        : `processed_audio_${type}.${
+            type === "binaural" ? "mp3" : "wav"
+          }`;
 
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
@@ -300,20 +311,8 @@ export default function Home() {
       </h1>
 
       {authError && (
-        <ErrorDisplay 
-          title="Authentication Error" 
-          message={authError}
-        />
+        <ErrorDisplay title="Authentication Error" message={authError} />
       )}
-
-      <Card className="mb-8">
-        <CardContent className="pt-6">
-          <p className="text-center text-muted-foreground">
-            Transform your stereo audio into immersive sound experiences using
-            IRCAM Amplify's cutting-edge technology.
-          </p>
-        </CardContent>
-      </Card>
 
       <Card className="mb-8">
         <CardContent className="pt-6">
@@ -323,6 +322,9 @@ export default function Home() {
               if (data?.ircam) {
                 setIrcamData(data.ircam);
               }
+              if (data?.sessionId) {
+                setCurrentSessionId(data.sessionId);
+              }
               setHasProcessedFiles(false);
             }}
           />
@@ -331,10 +333,12 @@ export default function Home() {
 
       {currentFile?.audioUrl && uploadSuccess && (
         <div className="space-y-8">
-          <Card className={cn(
-            "transition-opacity duration-200",
-            hasProcessedFiles && "opacity-50 pointer-events-none"
-          )}>
+          <Card
+            className={cn(
+              "transition-opacity duration-200",
+              hasProcessedFiles && "opacity-50 pointer-events-none"
+            )}
+          >
             <CardContent className="pt-4 pb-3">
               <AudioPreview audioUrl={currentFile.audioUrl} />
             </CardContent>
@@ -373,9 +377,10 @@ export default function Home() {
             <Card>
               <CardContent className="pt-6">
                 <div className="space-y-6">
-                  <h3 className="text-lg font-semibold">Preview and Download Audio</h3>
+                  <h3 className="text-lg font-semibold">
+                    Preview and Download Audio
+                  </h3>
 
-                  {/* Audio Preview Section */}
                   {currentFile?.audioUrl && (
                     <AudioPreview
                       audioUrl={currentFile.audioUrl}
@@ -383,17 +388,16 @@ export default function Home() {
                         binaural: `/temp/${sessionId}/binaural_californication-short_1_binaural.mp3`,
                         immersive: `/temp/${sessionId}/immersive_californication-short_1_immersive.wav`,
                         binauralSize: fileSizes.binaural,
-                        immersiveSize: fileSizes.immersive
+                        immersiveSize: fileSizes.immersive,
                       }}
                     />
                   )}
 
-                  {/* Download Buttons */}
                   <div className="space-y-3">
                     <div className="grid grid-cols-2 gap-3">
                       <Button
                         className="w-full py-4 text-sm"
-                        onClick={() => handleDownloadFile('binaural')}
+                        onClick={() => handleDownloadFile("binaural")}
                         variant="secondary"
                         disabled={!sessionId}
                       >
@@ -402,7 +406,7 @@ export default function Home() {
                       </Button>
                       <Button
                         className="w-full py-4 text-sm"
-                        onClick={() => handleDownloadFile('immersive')}
+                        onClick={() => handleDownloadFile("immersive")}
                         variant="secondary"
                         disabled={!sessionId}
                       >

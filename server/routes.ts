@@ -187,41 +187,34 @@ export function registerRoutes(app: Express): Server {
   );
 
   // Get current file state
-  app.get("/api/current-file", async (_req, res) => {
+  app.get("/api/current-file", async (req, res) => {
     try {
-      const sessions = await fs.readdir(TEMP_DIR);
-      log(`Found ${sessions.length} active sessions`);
+      const sessionId = req.query.sessionId as string;
 
-      if (sessions.length > 0) {
-        const sessionStats = await Promise.all(
-          sessions.map(async (session) => {
-            const stats = await fs.stat(path.join(TEMP_DIR, session));
-            return { session, timestamp: stats.mtime.getTime() };
-          })
-        );
-
-        const sortedSessions = sessionStats
-          .sort((a, b) => b.timestamp - a.timestamp)
-          .map(s => s.session);
-
-        const latestSession = sortedSessions[0];
-        const sessionDir = path.join(TEMP_DIR, latestSession);
-        const files = await fs.readdir(sessionDir);
-        const originalFile = files.find(f => f.startsWith('original_'));
-
-        if (!originalFile) {
-          log("No original file found in session");
-          return res.json({ audioUrl: null });
-        }
-
-        const ircamData = sessionStore.getSession(latestSession);
-        const audioUrl = `/temp/${latestSession}/${originalFile}`;
-        log(`Serving audio URL: ${audioUrl}`);
-
-        res.json({ audioUrl, ircam: ircamData });
-      } else {
-        res.json({ audioUrl: null });
+      if (!sessionId) {
+        return res.json({ audioUrl: null });
       }
+
+      const sessionDir = path.join(TEMP_DIR, sessionId);
+
+      try {
+        await fs.access(sessionDir);
+      } catch {
+        return res.json({ audioUrl: null });
+      }
+
+      const files = await fs.readdir(sessionDir);
+      const originalFile = files.find(f => f.startsWith('original_'));
+
+      if (!originalFile) {
+        return res.json({ audioUrl: null });
+      }
+
+      const ircamData = sessionStore.getSession(sessionId);
+      const audioUrl = `/temp/${sessionId}/${originalFile}`;
+      log(`Serving audio URL: ${audioUrl}`);
+
+      res.json({ audioUrl, ircam: ircamData });
     } catch (error) {
       log(`Failed to get current file: ${error}`, 'error');
       res.status(500).json({ message: "Failed to get current file" });
